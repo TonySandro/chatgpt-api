@@ -1,27 +1,34 @@
 import { ChatJob } from "./models/chat-job";
-import { JobQueueService } from "./services/job-queue-service";
 import { OpenAIChatProcessor } from "./services/openai-chat-processor";
+import { RabbitMqConnection } from "./services/rabbit-connection";
 
-const jobQueueService = new JobQueueService();
-const chatProcessor = new OpenAIChatProcessor();
+async function startWorker() {
+  const rabbitConn = RabbitMqConnection.getInstance();
+  await rabbitConn.connect();
 
-async function pollJobs(): Promise<void> {
-  while (true) {
-    try {
-      const job: ChatJob | null = await jobQueueService.getNextJob();
+  const channel = rabbitConn.getChannel();
+  const queue = "chatgpt-jobs";
+  const chatProcessor = new OpenAIChatProcessor();
 
-      if (job && job.id) {
-        await chatProcessor.process(job);
-        await jobQueueService.acknowledgeJob(job.id);
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+  await channel.assertQueue(queue, { durable: true });
+  console.log("Worker pronto. Aguardando mensagens na fila:", queue);
+
+  channel.consume(
+    queue,
+    async (msg) => {
+      if (msg) {
+        try {
+          const job: ChatJob = JSON.parse(msg.content.toString());
+          console.log("Mensagem recebida:", job.prompt);
+          await chatProcessor.process(job);
+          channel.ack(msg);
+        } catch (error) {
+          console.error("Erro ao processar mensagem:", error);
+        }
       }
-    } catch (error) {
-      console.error("Erro no ciclo de processamento de jobs:", error);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-    }
-  }
+    },
+    { noAck: false }
+  );
 }
 
-console.log("Worker iniciado. Aguardando jobs...");
-pollJobs();
+startWorker();
