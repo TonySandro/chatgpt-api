@@ -11,11 +11,13 @@
   "keywords": [],
   "license": "ISC",
   "dependencies": {
+    "amqplib": "^0.10.5",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "openai": "^4.89.0"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/node": "^22.13.13",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
