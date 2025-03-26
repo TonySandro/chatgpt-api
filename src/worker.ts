@@ -1,49 +1,27 @@
-import axios from "axios";
-import dotenv from "dotenv";
-import { OpenAI } from "openai";
-import { IChatJob } from "./models/chat-job";
+import { ChatJob } from "./models/chat-job";
+import { JobQueueService } from "./services/job-queue-service";
+import { OpenAIChatProcessor } from "./services/openai-chat-processor";
 
-dotenv.config();
+const jobQueueService = new JobQueueService();
+const chatProcessor = new OpenAIChatProcessor();
 
-const QUEUE_API_URL = process.env.QUEUE_API_URL!;
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-async function processJob(job: IChatJob) {
-  console.log("Job recebido:", job.prompt);
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: job.prompt }],
-    });
-
-    const resposta = completion.choices[0].message.content;
-    console.log("Resposta do ChatGPT:", resposta);
-  } catch (err) {
-    console.error("Erro ao chamar OpenAI:", err);
-  }
-}
-
-async function pollJobs() {
+async function pollJobs(): Promise<void> {
   while (true) {
     try {
-      const response = await axios.get(
-        `${QUEUE_API_URL}/queues/chatgpt-jobs/next`
-      );
-      const job: IChatJob | null = response.data;
+      const job: ChatJob | null = await jobQueueService.getNextJob();
 
       if (job && job.id) {
-        await processJob(job);
-        await axios.post(`${QUEUE_API_URL}/queues/chatgpt-jobs/${job.id}/ack`);
+        await chatProcessor.process(job);
+        await jobQueueService.acknowledgeJob(job.id);
       } else {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     } catch (error) {
-      console.error("Erro ao buscar job:", error);
+      console.error("Erro no ciclo de processamento de jobs:", error);
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 }
 
-console.log("Worker pronto. Aguardando...");
-
+console.log("Worker iniciado. Aguardando jobs...");
 pollJobs();

@@ -1,4 +1,4 @@
-export interface IChatJob {
+export interface ChatJob {
   id?: string;
   prompt: string;
 }

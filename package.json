@@ -11,7 +11,6 @@
   "keywords": [],
   "license": "ISC",
   "dependencies": {
-    "@types/express": "^5.0.1",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "openai": "^4.89.0"
